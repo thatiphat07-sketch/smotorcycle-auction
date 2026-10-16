@@ -2,7 +2,7 @@
 export default {
   content: [
     "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}", // 👈 บรรทัดนี้สำคัญมาก ห้ามพิมพ์ผิด
+    "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {},
