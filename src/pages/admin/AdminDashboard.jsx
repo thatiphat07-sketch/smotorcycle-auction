@@ -8,7 +8,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      {/* Header แอดมิน */}
+      {/* แถบ Header แอดมิน */}
       <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-red-600/20 border border-red-500/30 text-red-500 rounded-xl">
@@ -22,7 +22,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* แถบเปลี่ยนเมนู */}
+        {/* ปุ่มเลือกเมนูหลังร้าน */}
         <div className="flex bg-slate-950 p-1.5 rounded-xl border border-slate-800 gap-1">
           <Link
             to="/admin/topup"
@@ -47,7 +47,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* สลับหน้าการใช้งาน */}
+      {/* ส่วนแสดงผลข้อมูลตามเมนูที่เลือก */}
       <section>
         <Routes>
           <Route path="topup" element={<AdminTopup />} />
