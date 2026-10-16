@@ -11,22 +11,21 @@ export default function Home() {
     fetchItems();
   }, []);
 
-  const fetchItems = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('auction_items')
-        .select('*')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
+const fetchItems = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('auction_items')
+      .select('*')
+      .eq('status', 'active'); // ตัด .order() ออกชั่วคราวเพื่อป้องกัน Error 400
 
-      if (error) throw error;
-      setItems(data || []);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    if (error) throw error;
+    setItems(data || []);
+  } catch (error) {
+    console.error('Error fetching data:', error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   if (loading) {
     return (
