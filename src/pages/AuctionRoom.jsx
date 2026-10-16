@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { ArrowLeft, Gavel, ShieldCheck, Flame, User } from 'lucide-react';
+import { ArrowLeft, Gavel, ShieldCheck, Clock, Flame, User, Video, AlertCircle } from 'lucide-react';
 
 export default function AuctionRoom() {
   const { id } = useParams();
@@ -13,24 +13,52 @@ export default function AuctionRoom() {
   const [bidAmount, setBidAmount] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  
-  // State สำหรับเก็บรูปภาพหลักที่เลือกดูอยู่
   const [selectedImage, setSelectedImage] = useState('');
+
+  // State สำหรับเวลาถอยหลัง
+  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0, isEnded: false });
 
   useEffect(() => {
     fetchData();
 
-    const subscription = supabase
-      .channel(`auction-${id}`)
+    // ฟังการอัปเดตข้อมูล Real-time (ทั้งราคาประมูลและการแก้ไขเวลาจากแอดมิน)
+    const channel = supabase
+      .channel(`auction-room-${id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bids', filter: `auction_item_id=eq.${id}` }, 
         () => fetchBids()
+      )
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'auction_items', filter: `id=eq.${id}` }, 
+        (payload) => setItem(payload.new)
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(subscription);
+      supabase.removeChannel(channel);
     };
   }, [id]);
+
+  // ระบบนับถอยหลัง Real-time
+  useEffect(() => {
+    if (!item?.end_time) return;
+
+    const interval = setInterval(() => {
+      const now = new Date().getTime();
+      const endTime = new Date(item.end_time).getTime();
+      const distance = endTime - now;
+
+      if (distance <= 0) {
+        setTimeLeft({ hours: 0, minutes: 0, seconds: 0, isEnded: true });
+        clearInterval(interval);
+      } else {
+        const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+        setTimeLeft({ hours, minutes, seconds, isEnded: false });
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [item?.end_time]);
 
   const fetchData = async () => {
     try {
@@ -43,12 +71,8 @@ export default function AuctionRoom() {
       
       setItem(itemData);
       
-      // ตั้งค่ารูปภาพเริ่มต้น (ถ้ามีคอลัมน์ images ให้ใช้รูปแรก ถ้าไม่มีให้ใช้ image_url)
-      if (itemData.images && Array.isArray(itemData.images) && itemData.images.length > 0) {
-        setSelectedImage(itemData.images[0]);
-      } else {
-        setSelectedImage(itemData.image_url);
-      }
+      const imgs = Array.isArray(itemData.images) && itemData.images.length > 0 ? itemData.images : [itemData.image_url];
+      setSelectedImage(imgs[0]);
 
       await fetchBids();
 
@@ -82,6 +106,7 @@ export default function AuctionRoom() {
 
   const handlePlaceBid = async (e) => {
     e.preventDefault();
+    if (timeLeft.isEnded) return alert('รายการประมูลนี้ปิดลงแล้ว');
     if (!userProfile) {
       alert('กรุณาเข้าสู่ระบบก่อนเสนอราคา');
       return navigate('/auth');
@@ -128,7 +153,6 @@ export default function AuctionRoom() {
 
   if (!item) return <div className="text-center p-10 text-slate-400">ไม่พบรายการประมูลนี้</div>;
 
-  // รายการรูปภาพทั้งหมด (ดึงจาก images array หรือ fallback ไปที่ image_url)
   const imageList = Array.isArray(item.images) && item.images.length > 0 ? item.images : [item.image_url];
 
   return (
@@ -142,19 +166,37 @@ export default function AuctionRoom() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* ฝั่งซ้าย: Gallery รูปภาพหลายมุม + รายละเอียดตัวรถ */}
+        {/* ฝั่งซ้าย: ดูสินค้าสด / รูปภาพ / รายละเอียด */}
         <div className="lg:col-span-7 space-y-4">
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl space-y-4">
             
-            {/* 1. รูปภาพหลักขนาดใหญ่ */}
+            {/* วิดีโอถ่ายทอดสด (ถ้ามีลิงก์ Live) */}
+            {item.live_url ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-red-400">
+                  <span className="flex items-center gap-1.5"><Video size={16} className="animate-pulse" /> ถ่ายทอดสดสภาพสินค้าจริง</span>
+                  <span className="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded font-black uppercase">LIVE</span>
+                </div>
+                <div className="aspect-video w-full rounded-xl overflow-hidden bg-black border border-slate-800">
+                  <iframe
+                    src={item.live_url.replace('watch?v=', 'embed/')}
+                    title="Live Stream"
+                    className="w-full h-full"
+                    allowFullScreen
+                  ></iframe>
+                </div>
+              </div>
+            ) : null}
+
+            {/* รูปภาพหลัก */}
             <div className="relative rounded-xl overflow-hidden bg-slate-950 border border-slate-800">
-              <img src={selectedImage || item.image_url} alt={item.title} className="w-full h-72 sm:h-96 object-cover transition-all duration-300" />
+              <img src={selectedImage || item.image_url} alt={item.title} className="w-full h-72 sm:h-96 object-cover" />
               <div className="absolute top-3 left-3 bg-slate-950/90 backdrop-blur-md px-3 py-1 rounded-lg border border-slate-700 text-xs font-bold text-red-400 flex items-center gap-1.5 shadow-lg">
                 <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span> Live Auction
               </div>
             </div>
 
-            {/* 2. Gallery รูปภาพย่อย (Thumbnails) กดสลับรูปภาพได้ */}
+            {/* อัลบั้มรูปย่อย */}
             {imageList.length > 1 && (
               <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
                 {imageList.map((img, idx) => (
@@ -171,7 +213,6 @@ export default function AuctionRoom() {
               </div>
             )}
 
-            {/* รายละเอียดเพิ่มเติม */}
             <div>
               <h1 className="text-2xl font-black text-white italic tracking-tight">{item.title}</h1>
               <p className="text-slate-400 text-xs mt-2 leading-relaxed bg-slate-950 p-3 rounded-lg border border-slate-800/80">
@@ -191,15 +232,32 @@ export default function AuctionRoom() {
           </div>
         </div>
 
-        {/* ฝั่งขวา: กระดานสู้ราคา Real-time */}
+        {/* ฝั่งขวา: นาฬิกานับถอยหลัง + กระดานสู้ราคา */}
         <div className="lg:col-span-5 space-y-4">
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-6 flex flex-col justify-between h-full">
             
             <div className="space-y-5">
-              <div className="bg-slate-950 p-5 rounded-xl border border-red-600/30 text-center relative overflow-hidden">
-                <div className="absolute top-0 right-0 bg-red-600/20 text-red-400 text-[10px] font-bold px-2.5 py-0.5 rounded-bl uppercase tracking-wider">
-                  Highest Bid
+              {/* ตัวนับถอยหลังปิดประมูล */}
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-slate-400 text-xs font-bold">
+                  <Clock size={18} className="text-red-500" />
+                  <span>ระยะเวลาคงเหลือ</span>
                 </div>
+                {timeLeft.isEnded ? (
+                  <span className="bg-red-600 text-white font-black text-xs px-3 py-1 rounded-lg uppercase tracking-wider">
+                    ปิดประมูลแล้ว
+                  </span>
+                ) : (
+                  <div className="flex gap-1.5 font-mono font-black text-red-500 text-lg">
+                    <span className="bg-slate-900 px-2 py-0.5 rounded border border-slate-800">{String(timeLeft.hours).padStart(2, '0')}</span>:
+                    <span className="bg-slate-900 px-2 py-0.5 rounded border border-slate-800">{String(timeLeft.minutes).padStart(2, '0')}</span>:
+                    <span className="bg-slate-900 px-2 py-0.5 rounded border border-slate-800">{String(timeLeft.seconds).padStart(2, '0')}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* ราคาสูงสุดปัจจุบัน */}
+              <div className="bg-slate-950 p-5 rounded-xl border border-red-600/30 text-center relative overflow-hidden">
                 <span className="text-xs text-slate-400 font-bold uppercase tracking-widest block mb-1">ราคาปัจจุบัน</span>
                 <p className="text-4xl font-black text-red-500 tracking-tight glow-red">
                   ฿ {currentMaxBid.toLocaleString()}
@@ -207,6 +265,7 @@ export default function AuctionRoom() {
                 <span className="text-[11px] text-slate-500 mt-1 block">ราคาเริ่มต้น: ฿{item.base_price?.toLocaleString()}</span>
               </div>
 
+              {/* ฟอร์มเสนอราคา */}
               <form onSubmit={handlePlaceBid} className="space-y-3">
                 <div className="flex justify-between items-center text-xs font-bold text-slate-300">
                   <span>ระบุราคาที่ต้องการสู้</span>
@@ -216,23 +275,25 @@ export default function AuctionRoom() {
                 <div className="flex gap-2">
                   <input
                     type="number"
+                    disabled={timeLeft.isEnded}
                     value={bidAmount}
                     onChange={(e) => setBidAmount(e.target.value)}
-                    placeholder={`เช่น ${minNextBid}`}
-                    className="flex-1 bg-slate-950 border border-slate-800 text-white p-3 rounded-xl font-bold focus:border-red-500 focus:outline-none text-base"
+                    placeholder={timeLeft.isEnded ? "ปิดการประมูล" : `เช่น ${minNextBid}`}
+                    className="flex-1 bg-slate-950 border border-slate-800 text-white p-3 rounded-xl font-bold focus:border-red-500 focus:outline-none text-base disabled:opacity-50"
                     min={minNextBid}
                   />
                   <button
                     type="submit"
-                    disabled={submitting}
-                    className="bg-red-600 hover:bg-red-700 text-white px-5 py-3 rounded-xl font-black tracking-wider uppercase transition shadow-lg shadow-red-600/30 flex items-center gap-1.5 disabled:bg-slate-800"
+                    disabled={submitting || timeLeft.isEnded}
+                    className="bg-red-600 hover:bg-red-700 text-white px-5 py-3 rounded-xl font-black tracking-wider uppercase transition shadow-lg shadow-red-600/30 flex items-center gap-1.5 disabled:bg-slate-800 disabled:opacity-50"
                   >
-                    <Gavel size={18} /> สู้ราคา
+                    <Gavel size={18} /> {timeLeft.isEnded ? 'หมดเวลา' : 'สู้ราคา'}
                   </button>
                 </div>
               </form>
             </div>
 
+            {/* ประวัติการสู้ราคา */}
             <div className="space-y-3 pt-4 border-t border-slate-800">
               <h3 className="font-extrabold text-sm text-slate-200 flex items-center justify-between">
                 <span className="flex items-center gap-1.5"><Flame size={16} className="text-red-500" /> ประวัติการเคาะราคา</span>
