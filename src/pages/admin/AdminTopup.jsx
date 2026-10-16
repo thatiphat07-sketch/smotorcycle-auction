@@ -5,7 +5,7 @@ import { CheckCircle, XCircle, Eye, RefreshCw } from 'lucide-react';
 export default function AdminTopup() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedSlip, setSelectedSlip] = useState(null); // สำหรับแสดง Popup ดูสลิปขยายใหญ่
+  const [selectedSlip, setSelectedSlip] = useState(null);
 
   useEffect(() => {
     fetchRequests();
@@ -14,7 +14,6 @@ export default function AdminTopup() {
   const fetchRequests = async () => {
     setLoading(true);
     try {
-      // ดึงรายการแจ้งโอนเงินสถานะ pending พร้อมข้อมูลโปรไฟล์ลูกค้า
       const { data, error } = await supabase
         .from('topup_requests')
         .select(`
@@ -146,7 +145,6 @@ export default function AdminTopup() {
         </div>
       )}
 
-      {/* Modal ป๊อปอัปดูรูปสลิปขนาดใหญ่ */}
       {selectedSlip && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
           <div className="bg-white p-4 rounded-xl max-w-md w-full relative shadow-2xl">

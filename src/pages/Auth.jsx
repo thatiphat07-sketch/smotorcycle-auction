@@ -17,7 +17,6 @@ export default function Auth() {
 
     try {
       if (isSignUp) {
-        // สมัครสมาชิก
         const { error } = await supabase.auth.signUp({
           email,
           password,
@@ -31,7 +30,6 @@ export default function Auth() {
         if (error) throw error;
         alert('สมัครสมาชิกสำเร็จ!');
       } else {
-        // เข้าสู่ระบบ
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,

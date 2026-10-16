@@ -1,6 +1,11 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
+import ProfileMenu from './pages/ProfileMenu';
+import Auth from './pages/Auth';
+import Topup from './pages/Topup';
+import AuctionRoom from './pages/AuctionRoom';
+import AdminDashboard from './pages/admin/AdminDashboard';
 
 export default function App() {
   return (
@@ -10,6 +15,11 @@ export default function App() {
         <main className="container mx-auto px-4 py-8">
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/auction/:id" element={<AuctionRoom />} />
+            <Route path="/profile" element={<ProfileMenu />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/topup" element={<Topup />} />
+            <Route path="/admin/*" element={<AdminDashboard />} />
           </Routes>
         </main>
       </div>

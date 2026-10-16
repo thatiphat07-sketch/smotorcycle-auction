@@ -68,7 +68,7 @@ export default function ProfileMenu() {
           </div>
           <button 
             onClick={() => navigate('/topup')}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition w-full sm:w-auto"
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition w-full sm:w-auto font-semibold"
           >
             แจ้งเติมเครดิต
           </button>

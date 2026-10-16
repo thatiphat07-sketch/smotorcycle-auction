@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { ArrowLeft, Gavel, ShieldCheck, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Gavel, ShieldCheck } from 'lucide-react';
 
 export default function AuctionRoom() {
   const { id } = useParams();
@@ -17,12 +17,11 @@ export default function AuctionRoom() {
   useEffect(() => {
     fetchData();
 
-    // ฟังการเสนอราคาแบบ Real-time
     const subscription = supabase
       .channel(`auction-${id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bids', filter: `auction_item_id=eq.${id}` }, 
-        (payload) => {
-          fetchBids(); // โหลดรายการราคาใหม่เมื่อมีคนเสนอราคา
+        () => {
+          fetchBids();
         }
       )
       .subscribe();
@@ -34,7 +33,6 @@ export default function AuctionRoom() {
 
   const fetchData = async () => {
     try {
-      // 1. ดึงข้อมูลสินค้ารายการนี้
       const { data: itemData, error: itemError } = await supabase
         .from('auction_items')
         .select('*')
@@ -43,10 +41,8 @@ export default function AuctionRoom() {
       if (itemError) throw itemError;
       setItem(itemData);
 
-      // 2. ดึงประวัติการเสนอราคา
       await fetchBids();
 
-      // 3. ดึงข้อมูล User และ เครดิต
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profileData } = await supabase
@@ -72,9 +68,8 @@ export default function AuctionRoom() {
     if (!error) setBids(data || []);
   };
 
-  // คำนวณราคาสูงสุด ณ ปัจจุบัน
   const currentMaxBid = bids.length > 0 ? bids[0].amount : (item?.base_price || 0);
-  const minNextBid = currentMaxBid + 100; // เพิ่มขั้นต่ำครั้งละ 100 บาท
+  const minNextBid = currentMaxBid + 100;
 
   const handlePlaceBid = async (e) => {
     e.preventDefault();
@@ -83,7 +78,6 @@ export default function AuctionRoom() {
       return navigate('/auth');
     }
 
-    // เช็คเครดิตมัดจำคงเหลือ
     if ((userProfile.credit_balance || 0) < item.deposit_required) {
       alert(`คุณต้องมีเครดิตมัดจำอย่างน้อย ฿${item.deposit_required.toLocaleString()} จึงจะเสนอราคาได้`);
       return navigate('/topup');
@@ -125,7 +119,6 @@ export default function AuctionRoom() {
       </button>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-6 rounded-xl shadow-md border">
-        {/* รูปภาพและรายละเอียด */}
         <div>
           <img src={item.image_url} alt={item.title} className="w-full h-64 object-cover rounded-lg border mb-4" />
           <h1 className="text-2xl font-bold text-gray-800">{item.title}</h1>
@@ -133,20 +126,18 @@ export default function AuctionRoom() {
 
           <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-800 flex items-center gap-2">
             <ShieldCheck size={18} />
-            <span>ต้องมัดจำป้ายประมูล <b>฿{item.deposit_required.toLocaleString()}</b> (สิทธิ์คงเหลือ: ฿{userProfile?.credit_balance || 0})</span>
+            <span>ต้องมัดจำป้ายประมูล <b>฿{item.deposit_required?.toLocaleString()}</b> (สิทธิ์คงเหลือ: ฿{userProfile?.credit_balance || 0})</span>
           </div>
         </div>
 
-        {/* กระดานเสนอราคา */}
         <div className="flex flex-col justify-between border-l md:pl-6 pt-4 md:pt-0">
           <div>
             <p className="text-sm text-gray-500">ราคาปัจจุบัน</p>
             <p className="text-4xl font-bold text-red-600 my-1">
               ฿ {currentMaxBid.toLocaleString()}
             </p>
-            <p className="text-xs text-gray-400">ราคาเริ่มต้น: ฿{item.base_price.toLocaleString()}</p>
+            <p className="text-xs text-gray-400">ราคาเริ่มต้น: ฿{item.base_price?.toLocaleString()}</p>
 
-            {/* ฟอร์มเสนอราคา */}
             <form onSubmit={handlePlaceBid} className="mt-6 space-y-3">
               <label className="block text-sm font-semibold text-gray-700">
                 เสนอราคาใหม่ (ขั้นต่ำ ฿{minNextBid.toLocaleString()})
@@ -171,7 +162,6 @@ export default function AuctionRoom() {
             </form>
           </div>
 
-          {/* ประวัติการสู้ราคา */}
           <div className="mt-6">
             <h3 className="font-bold text-gray-700 mb-2 border-b pb-1 text-sm">ประวัติการเสนอราคา</h3>
             <div className="max-h-40 overflow-y-auto space-y-2">
