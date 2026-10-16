@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { ArrowLeft, Gavel, ShieldCheck, Clock, Flame, User, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Gavel, ShieldCheck, Flame, User } from 'lucide-react';
 
 export default function AuctionRoom() {
   const { id } = useParams();
@@ -13,17 +13,17 @@ export default function AuctionRoom() {
   const [bidAmount, setBidAmount] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  
+  // State สำหรับเก็บรูปภาพหลักที่เลือกดูอยู่
+  const [selectedImage, setSelectedImage] = useState('');
 
   useEffect(() => {
     fetchData();
 
-    // ฟังการเสนอราคาแบบ Real-time จาก Supabase
     const subscription = supabase
       .channel(`auction-${id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bids', filter: `auction_item_id=eq.${id}` }, 
-        () => {
-          fetchBids();
-        }
+        () => fetchBids()
       )
       .subscribe();
 
@@ -34,19 +34,24 @@ export default function AuctionRoom() {
 
   const fetchData = async () => {
     try {
-      // 1. ดึงข้อมูลรถประมูล
       const { data: itemData, error: itemError } = await supabase
         .from('auction_items')
         .select('*')
         .eq('id', id)
         .single();
       if (itemError) throw itemError;
+      
       setItem(itemData);
+      
+      // ตั้งค่ารูปภาพเริ่มต้น (ถ้ามีคอลัมน์ images ให้ใช้รูปแรก ถ้าไม่มีให้ใช้ image_url)
+      if (itemData.images && Array.isArray(itemData.images) && itemData.images.length > 0) {
+        setSelectedImage(itemData.images[0]);
+      } else {
+        setSelectedImage(itemData.image_url);
+      }
 
-      // 2. ดึงประวัติการสู้ราคา
       await fetchBids();
 
-      // 3. ดึงข้อมูลผู้ใช้งานและเครดิตมัดจำ
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profileData } = await supabase
@@ -72,7 +77,6 @@ export default function AuctionRoom() {
     if (!error) setBids(data || []);
   };
 
-  // คำนวณราคาสูงสุดและขั้นต่ำของการเสนอราคาถัดไป
   const currentMaxBid = bids.length > 0 ? bids[0].amount : (item?.base_price || 0);
   const minNextBid = currentMaxBid + 100;
 
@@ -83,7 +87,6 @@ export default function AuctionRoom() {
       return navigate('/auth');
     }
 
-    // เช็คสิทธิ์เครดิตมัดจำ
     if ((userProfile.credit_balance || 0) < item.deposit_required) {
       alert(`คุณต้องมีเครดิตมัดจำอย่างน้อย ฿${item.deposit_required.toLocaleString()} จึงจะเสนอราคาได้`);
       return navigate('/topup');
@@ -125,9 +128,11 @@ export default function AuctionRoom() {
 
   if (!item) return <div className="text-center p-10 text-slate-400">ไม่พบรายการประมูลนี้</div>;
 
+  // รายการรูปภาพทั้งหมด (ดึงจาก images array หรือ fallback ไปที่ image_url)
+  const imageList = Array.isArray(item.images) && item.images.length > 0 ? item.images : [item.image_url];
+
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-12">
-      {/* ปุ่มย้อนกลับ */}
       <button 
         onClick={() => navigate('/')} 
         className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-red-400 transition bg-slate-900 border border-slate-800 px-3.5 py-2 rounded-lg"
@@ -137,18 +142,36 @@ export default function AuctionRoom() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* ฝั่งซ้าย: รูปภาพและรายละเอียดตัวรถ (7 คอลัมน์) */}
+        {/* ฝั่งซ้าย: Gallery รูปภาพหลายมุม + รายละเอียดตัวรถ */}
         <div className="lg:col-span-7 space-y-4">
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl space-y-4">
-            {/* รูปภาพพร้อม Badge */}
+            
+            {/* 1. รูปภาพหลักขนาดใหญ่ */}
             <div className="relative rounded-xl overflow-hidden bg-slate-950 border border-slate-800">
-              <img src={item.image_url} alt={item.title} className="w-full h-72 sm:h-96 object-cover" />
+              <img src={selectedImage || item.image_url} alt={item.title} className="w-full h-72 sm:h-96 object-cover transition-all duration-300" />
               <div className="absolute top-3 left-3 bg-slate-950/90 backdrop-blur-md px-3 py-1 rounded-lg border border-slate-700 text-xs font-bold text-red-400 flex items-center gap-1.5 shadow-lg">
                 <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span> Live Auction
               </div>
             </div>
 
-            {/* หัวข้อและสเปก */}
+            {/* 2. Gallery รูปภาพย่อย (Thumbnails) กดสลับรูปภาพได้ */}
+            {imageList.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+                {imageList.map((img, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setSelectedImage(img)}
+                    className={`relative rounded-lg overflow-hidden border-2 flex-shrink-0 w-20 h-20 transition ${
+                      selectedImage === img ? 'border-red-600 scale-95 shadow-lg shadow-red-600/30' : 'border-slate-800 opacity-60 hover:opacity-100'
+                    }`}
+                  >
+                    <img src={img} alt={`มุมที่ ${idx + 1}`} className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* รายละเอียดเพิ่มเติม */}
             <div>
               <h1 className="text-2xl font-black text-white italic tracking-tight">{item.title}</h1>
               <p className="text-slate-400 text-xs mt-2 leading-relaxed bg-slate-950 p-3 rounded-lg border border-slate-800/80">
@@ -156,7 +179,6 @@ export default function AuctionRoom() {
               </p>
             </div>
 
-            {/* บล็อกสิทธิ์มัดจำ */}
             <div className="bg-gradient-to-r from-slate-950 to-slate-900 border border-red-900/40 p-4 rounded-xl flex items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2 text-slate-300">
                 <ShieldCheck size={20} className="text-green-400 flex-shrink-0" />
@@ -169,12 +191,11 @@ export default function AuctionRoom() {
           </div>
         </div>
 
-        {/* ฝั่งขวา: กระดานสู้ราคา Real-time (5 คอลัมน์) */}
+        {/* ฝั่งขวา: กระดานสู้ราคา Real-time */}
         <div className="lg:col-span-5 space-y-4">
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-6 flex flex-col justify-between h-full">
             
             <div className="space-y-5">
-              {/* ส่วนแสดงราคาสูงสุดปัจจุบัน */}
               <div className="bg-slate-950 p-5 rounded-xl border border-red-600/30 text-center relative overflow-hidden">
                 <div className="absolute top-0 right-0 bg-red-600/20 text-red-400 text-[10px] font-bold px-2.5 py-0.5 rounded-bl uppercase tracking-wider">
                   Highest Bid
@@ -186,7 +207,6 @@ export default function AuctionRoom() {
                 <span className="text-[11px] text-slate-500 mt-1 block">ราคาเริ่มต้น: ฿{item.base_price?.toLocaleString()}</span>
               </div>
 
-              {/* ฟอร์มเสนอราคา */}
               <form onSubmit={handlePlaceBid} className="space-y-3">
                 <div className="flex justify-between items-center text-xs font-bold text-slate-300">
                   <span>ระบุราคาที่ต้องการสู้</span>
@@ -213,7 +233,6 @@ export default function AuctionRoom() {
               </form>
             </div>
 
-            {/* ประวัติการสู้ราคา Real-time */}
             <div className="space-y-3 pt-4 border-t border-slate-800">
               <h3 className="font-extrabold text-sm text-slate-200 flex items-center justify-between">
                 <span className="flex items-center gap-1.5"><Flame size={16} className="text-red-500" /> ประวัติการเคาะราคา</span>
