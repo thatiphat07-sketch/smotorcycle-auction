@@ -19,7 +19,7 @@ export default function App() {
             <Route path="/profile" element={<ProfileMenu />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/topup" element={<Topup />} />
-        
+            <Route path="/admin/*" element={<AdminDashboard />} />
           </Routes>
         </main>
       </div>
