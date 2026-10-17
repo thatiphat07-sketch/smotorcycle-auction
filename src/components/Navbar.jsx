@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, User, ShieldAlert, Flame, Menu, X } from 'lucide-react';
-
+import { Home, User, ShieldAlert, Flame, Menu, X, Gavel, Wallet, Settings, Trophy } from 'lucide-react';
+  const navLinks = [
+    { name: 'หน้าร้าน', path: '/', icon: <Home size={18} /> },
+    { name: 'ห้องประมูล', path: '/auction', icon: <Gavel size={18} /> },
+    { name: 'แจ้งโอนเงินมัดจำ', path: '/topup', icon: <Wallet size={18} /> },
+    { name: 'รถที่ชนะประมูล', path: '/my-wins', icon: <Trophy size={18} /> }, // เพิ่มบรรทัดนี้
+  ];
 export default function Navbar() {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
